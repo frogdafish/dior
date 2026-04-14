@@ -2,33 +2,179 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Discord</title>
   <link rel="icon" href="favicon.png" type="image/png" />
   <style>
-    body { margin:0; font-family:'Segoe UI',sans-serif; background:#36393f; color:white; display:flex; height:100vh; }
-    .sidebar { width:240px; background:#2f3136; padding:15px; display:flex; flex-direction:column; }
-    .sidebar h3 { color:#8e9297; font-size:12px; margin-bottom:10px; text-transform:uppercase; }
-    .channel { padding:6px 10px; border-radius:4px; cursor:pointer; color:#b9bbbe; transition:.15s; }
-    .channel:hover { background:#40444b; color:white; }
-    .edit-profile { margin-top:auto; background:#40444b; text-align:center; padding:8px; border-radius:4px; cursor:pointer; }
-    .edit-profile:hover { background:#5865f2; }
-    .chat { flex:1; display:flex; flex-direction:column; }
-    .header { padding:15px; background:#2f3136; font-weight:bold; border-bottom:1px solid #202225; }
-    .messages { flex:1; padding:20px; overflow-y:auto; }
-    .message { margin-bottom:10px; }
-    .message-row { display:flex; align-items:flex-start; gap:8px; }
-    .avatar { width:32px; height:32px; border-radius:50%; object-fit:cover; background:#5865f2; flex-shrink:0; margin-top:2px; border:1px solid rgba(255,255,255,0.15); }
-    .message-content { line-height:1.35; }
-    .username { font-weight:bold; cursor:pointer; color:#7289da; }
-    .username:hover { text-decoration:underline; }
-    .input-area { padding:10px 15px; background:#40444b; display:flex; }
-    input { flex:1; padding:10px; border-radius:4px; border:none; background:#303339; color:white; }
-    button { margin-left:10px; padding:10px 16px; border-radius:4px; border:none; background:#7289da; color:white; cursor:pointer; }
-    .typing-indicator { font-size:12px; color:#b9bbbe; margin-left:5px; font-style:italic; }
-    .mute-status { color:#ff6b6b; font-weight:bold; }
-    button.shop-btn { background:#43b581; margin:5px 0; padding:8px 16px; }
-    button.shop-btn:hover { background:#3da674; }
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', sans-serif;
+      background: #36393f;
+      color: white;
+    }
+
+    body {
+      display: flex;
+      height: 100dvh;
+    }
+
+    .sidebar {
+      width: 240px;
+      max-width: 40vw;
+      background: #2f3136;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .sidebar h3 {
+      color: #8e9297;
+      font-size: 12px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    .channel {
+      padding: 8px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #b9bbbe;
+      transition: .15s;
+    }
+
+    .channel:hover {
+      background: #40444b;
+      color: white;
+    }
+
+    .edit-profile {
+      margin-top: auto;
+      background: #40444b;
+      text-align: center;
+      padding: 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .edit-profile:hover {
+      background: #5865f2;
+    }
+
+    .chat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .header {
+      padding: 15px;
+      background: #2f3136;
+      font-weight: bold;
+      border-bottom: 1px solid #202225;
+    }
+
+    .messages {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .message {
+      margin-bottom: 10px;
+    }
+
+    .message-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #5865f2;
+      flex-shrink: 0;
+      margin-top: 2px;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .message-content {
+      line-height: 1.35;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    .username {
+      font-weight: bold;
+      cursor: pointer;
+      color: #7289da;
+    }
+
+    .username:hover {
+      text-decoration: underline;
+    }
+
+    .input-area {
+      padding: 10px 15px;
+      background: #40444b;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 10px;
+      border-radius: 4px;
+      border: none;
+      background: #303339;
+      color: white;
+      outline: none;
+    }
+
+    button {
+      padding: 10px 16px;
+      border-radius: 4px;
+      border: none;
+      background: #7289da;
+      color: white;
+      cursor: pointer;
+    }
+
+    .typing-indicator {
+      font-size: 12px;
+      color: #b9bbbe;
+      margin-left: 15px;
+      margin-bottom: 10px;
+      font-style: italic;
+    }
+
+    .mute-status {
+      color: #ff6b6b;
+      font-weight: bold;
+    }
+
+    button.shop-btn {
+      background: #43b581;
+      margin: 5px 0;
+      padding: 8px 16px;
+    }
+
+    button.shop-btn:hover {
+      background: #3da674;
+    }
 
     .profile-overlay {
       position: fixed;
@@ -38,21 +184,28 @@
       align-items: center;
       justify-content: center;
       z-index: 10000;
+      padding: 15px;
     }
 
     .profile-modal {
-      width: 360px;
-      max-width: calc(100vw - 30px);
+      width: min(360px, 100%);
       background: #2f3136;
       border: 1px solid #202225;
       border-radius: 12px;
       padding: 18px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      max-height: 90dvh;
+      overflow-y: auto;
     }
 
-    .profile-modal h3 { margin: 0 0 12px; font-size: 18px; }
+    .profile-modal h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
 
-    .profile-field { margin-bottom: 12px; }
+    .profile-field {
+      margin-bottom: 12px;
+    }
 
     .profile-field label {
       display: block;
@@ -63,7 +216,6 @@
 
     .profile-field input[type="text"] {
       width: 100%;
-      box-sizing: border-box;
       padding: 10px;
       border-radius: 6px;
       border: none;
@@ -74,7 +226,6 @@
 
     .profile-field input[type="file"] {
       width: 100%;
-      box-sizing: border-box;
       color: white;
       background: transparent;
       padding: 6px 0;
@@ -102,8 +253,92 @@
       margin-left: 0;
     }
 
-    .cancel-btn { background: #555; }
-    .cancel-btn:hover { background: #666; }
+    .cancel-btn {
+      background: #555;
+    }
+
+    .cancel-btn:hover {
+      background: #666;
+    }
+
+    .game-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      z-index: 9999;
+    }
+
+    .game-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .game-close {
+      position: absolute;
+      top: 8px;
+      right: 15px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      background: #7289da;
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+      z-index: 10001;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 700px) {
+      body {
+        flex-direction: column;
+        height: 100dvh;
+      }
+
+      .sidebar {
+        width: 100%;
+        max-width: none;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px;
+        align-items: center;
+      }
+
+      .sidebar h3 {
+        width: 100%;
+        margin: 0 0 6px;
+      }
+
+      .channel {
+        flex: 1 1 calc(50% - 8px);
+        text-align: center;
+      }
+
+      .edit-profile {
+        width: 100%;
+        margin-top: 0;
+      }
+
+      .messages {
+        padding: 12px;
+      }
+
+      .input-area {
+        padding: 10px;
+      }
+
+      button {
+        padding: 10px 12px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -141,7 +376,7 @@
       let currentChannel = "general";
 
       if (!username) {
-        while (!username) username = prompt("Enter username:");
+        username = prompt("Enter username:")?.trim() || "Guest";
         localStorage.setItem("username", username);
       }
 
@@ -547,14 +782,17 @@
         if (overlay) return overlay;
         overlay = document.createElement("div");
         overlay.id = "snake-fullscreen-overlay";
-        overlay.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.9);z-index:9999;overflow:hidden;";
+        overlay.className = "game-overlay";
+
         const closeBtn = document.createElement("button");
         closeBtn.textContent = "❌";
-        closeBtn.style.cssText = "position:absolute;top:8px;right:15px;width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;background:#7289da;color:white;font-size:20px;font-weight:bold;z-index:10000;display:flex;align-items:center;justify-content:center;";
+        closeBtn.className = "game-close";
         closeBtn.onclick = () => overlay.remove();
+
         const frame = document.createElement("iframe");
         frame.src = "https://frogdafish.github.io/Snek";
-        frame.style.cssText = "position:absolute;top:0;left:0;width:100vw;height:100vh;border:none;display:block;";
+        frame.className = "game-frame";
+
         overlay.appendChild(closeBtn);
         overlay.appendChild(frame);
         document.body.appendChild(overlay);
@@ -566,14 +804,17 @@
         if (overlay) return overlay;
         overlay = document.createElement("div");
         overlay.id = "slope-fullscreen-overlay";
-        overlay.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.9);z-index:9999;overflow:hidden;";
+        overlay.className = "game-overlay";
+
         const closeBtn = document.createElement("button");
         closeBtn.textContent = "❌";
-        closeBtn.style.cssText = "position:absolute;top:8px;right:15px;width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;background:#7289da;color:white;font-size:20px;font-weight:bold;z-index:10000;display:flex;align-items:center;justify-content:center;";
+        closeBtn.className = "game-close";
         closeBtn.onclick = () => overlay.remove();
+
         const frame = document.createElement("iframe");
         frame.src = "slope.html";
-        frame.style.cssText = "position:absolute;top:0;left:0;width:100vw;height:100vh;border:none;display:block;";
+        frame.className = "game-frame";
+
         overlay.appendChild(closeBtn);
         overlay.appendChild(frame);
         document.body.appendChild(overlay);
