@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Discord</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body{margin:0;font-family:Segoe UI,sans-serif;background:#36393f;color:#fff;display:flex;height:100vh;overflow:hidden}
     .sidebar{width:240px;background:#2f3136;padding:15px;display:flex;flex-direction:column;box-sizing:border-box}
@@ -44,6 +43,8 @@
     .color-btn{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.25);padding:0}
     .eraser-btn{background:#d9d9d9;color:#111}
   </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="sidebar">
@@ -53,7 +54,7 @@
     <div class="channel" data-channel="coding"># coding</div>
     <div class="channel" data-channel="stats"># stats</div>
     <div class="channel" data-channel="shop"># shop</div>
-    <div class="edit-profile" id="editProfileBtn">Edit Profile</div>
+    <div class="edit-profile" id="editProfileBtn"> Edit Profile</div>
   </div>
 
   <div class="chat">
@@ -71,31 +72,21 @@
 
     const SUPABASE_URL = "YOUR_SUPABASE_URL";
     const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentChannel = 'general';
     let username = localStorage.getItem('username') || prompt('Enter username:') || 'Guest';
     localStorage.setItem('username', username);
 
-    const storeKey = 'demoChatData_v5';
-    const loadStore = () => JSON.parse(localStorage.getItem(storeKey) || '{"profiles":{}}');
+    const storeKey = 'demoChatData_v4';
+    const loadStore = () => JSON.parse(localStorage.getItem(storeKey) || '{"profiles":{},"messages":[]}');
     const saveStore = s => localStorage.setItem(storeKey, JSON.stringify(s));
     const getFallbackAvatar = n => `https://ui-avatars.com/api/?name=${encodeURIComponent(n)}&background=7289da&color=fff&rounded=true&size=64`;
     const setAvatarFallback = (img, n) => img.onerror = () => { img.onerror = null; img.src = getFallbackAvatar(n); };
 
     function ensureProfile(){
-      const s = loadStore();
-      if(!s.profiles[username]) s.profiles[username] = {
-        username,
-        xp: 0,
-        level: 1,
-        coins: 0,
-        profile_picture: null,
-        muted_until: null,
-        mute_reason: null,
-        owned_snake: false,
-        owned_slope: false
-      };
+      const s=loadStore();
+      if(!s.profiles[username]) s.profiles[username]={username, xp:0, level:1, coins:0, profile_picture:null, muted_until:null, mute_reason:null, owned_snake:false, owned_slope:false};
       saveStore(s);
     }
 
@@ -105,10 +96,10 @@
     }
 
     function addMessage(user, text, avatarUrl=null){
-      const div = document.createElement('div');
-      div.className = 'message';
+      const div=document.createElement('div');
+      div.className='message';
       const safe = String(text).replace(/\n/g,'<br>');
-      div.innerHTML = `<div class="message-row"><img class="avatar" src="${avatarUrl || getFallbackAvatar(user)}" alt="avatar"><div class="message-content"><span class="username">${user}</span> ${safe}</div></div>`;
+      div.innerHTML=`<div class="message-row"><img class="avatar" src="${avatarUrl||getFallbackAvatar(user)}" alt="avatar"><div class="message-content"><span class="username">${user}</span> ${safe}</div></div>`;
       const img = div.querySelector('.avatar');
       setAvatarFallback(img, user);
       $('messages').appendChild(div);
@@ -118,77 +109,75 @@
     function renderChannelHeader(channel){
       $('channelName').textContent = channel === 'stats' ? '# stats' : channel === 'shop' ? '# shop' : `# ${channel}`;
       $('messageInput').placeholder = (channel === 'stats' || channel === 'shop') ? '' : `Message #${channel}`;
-      $('messageInput').disabled = (channel === 'stats' || channel === 'shop');
-      $('sendBtn').disabled = (channel === 'stats' || channel === 'shop');
     }
 
     async function loadMessages(channel){
-      if(channel === 'stats') return loadStats();
-      if(channel === 'shop') return loadShop();
-
       $('messages').innerHTML = '';
-      const { data, error } = await supabaseClient
-        .from('messages')
-        .select('*')
-        .eq('channel', channel)
-        .order('created_at', { ascending: true });
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('channel', channel)
+          .order('created_at', { ascending: true });
 
-      if(error){
-        console.error(error);
-        addMessage('System', 'Failed to load messages.');
-        return;
+        if (error) throw error;
+
+        if (!data || !data.length) {
+          addMessage('System', 'No messages yet.');
+          return;
+        }
+
+        data.forEach(m => {
+          addMessage(m.username, m.text, m.avatar_url || avatarFor(m.username));
+        });
+      } catch (err) {
+        console.error('Failed to load messages:', err);
+        addMessage('System', 'Failed to load messages from Supabase.');
       }
-
-      if(!data || !data.length){
-        addMessage('System', 'No messages yet.');
-        return;
-      }
-
-      data.forEach(m => addMessage(m.username, m.text, m.avatar_url || avatarFor(m.username)));
     }
 
     async function sendMessage(){
-      const text = $('messageInput').value.trim();
+      const text=$('messageInput').value.trim();
       if(!text) return;
-      if(currentChannel === 'stats' || currentChannel === 'shop') return alert('You cannot send messages in this channel!');
+      if(currentChannel==='stats' || currentChannel==='shop') return alert('You cannot send messages in this channel!');
 
-      const s = loadStore();
-      const p = s.profiles[username];
+      const s=loadStore();
+      const p=s.profiles[username];
       if(p?.muted_until) return alert(`You are muted!\n\nReason: ${p.mute_reason || 'No reason specified'}`);
 
-      const payload = {
-        channel: currentChannel,
-        username,
-        text,
-        avatar_url: p?.profile_picture || null,
-        created_at: new Date().toISOString()
-      };
+      const avatar_url = avatarFor(username);
 
-      const { error } = await supabaseClient.from('messages').insert(payload);
-      if(error){
-        console.error(error);
-        alert('Message failed to send.');
-        return;
+      try {
+        const { error } = await supabase.from('messages').insert([{
+          channel: currentChannel,
+          username,
+          text,
+          avatar_url,
+          created_at: new Date().toISOString()
+        }]);
+
+        if (error) throw error;
+
+        $('messageInput').value = '';
+        await loadMessages(currentChannel);
+      } catch (err) {
+        console.error('Failed to send message:', err);
+        alert('Message could not be sent.');
       }
-
-      $('messageInput').value = '';
-      await loadMessages(currentChannel);
     }
 
     function loadStats(){
-      const s = loadStore();
-      const p = s.profiles[username];
-      $('messages').innerHTML = '';
-      addMessage('System', `${p.username}<br><strong>Level:</strong> ${p.level}<br><strong>XP:</strong> ${p.xp}<br><strong>XP to next level:</strong> ${Math.max(p.level * 100 - p.xp, 0)}<br><strong>Coins:</strong> ${p.coins}<br><strong>Owns Snake:</strong> ${p.owned_snake ? 'Yes' : 'No'}<br><strong>Owns Slope:</strong> ${p.owned_slope ? 'Yes' : 'No'}`, avatarFor(p.username));
+      const s=loadStore();
+      const p=s.profiles[username];
+      $('messages').innerHTML='';
+      addMessage('System', ` ${p.username}<br><strong> Level:</strong> ${p.level}<br><strong> XP:</strong> ${p.xp}<br><strong>XP to next level:</strong> ${Math.max(p.level*100-p.xp,0)}<br><strong> Coins:</strong> ${p.coins}<br><strong> Owns Snake:</strong> ${p.owned_snake ? 'Yes' : 'No'}<br><strong> Owns Slope:</strong> ${p.owned_slope ? 'Yes' : 'No'}` , avatarFor(p.username));
     }
 
     function openOverlay(innerHTML){
-      const old = document.querySelector('.overlay');
-      if(old) old.remove();
-      const o = document.createElement('div');
-      o.className = 'overlay';
-      o.innerHTML = `<div class="overlay-box"><button class="close-btn"></button>${innerHTML}</div>`;
-      o.querySelector('.close-btn').onclick = () => o.remove();
+      const old=document.querySelector('.overlay'); if(old) old.remove();
+      const o=document.createElement('div'); o.className='overlay';
+      o.innerHTML=`<div class="overlay-box"><button class="close-btn"></button>${innerHTML}</div>`;
+      o.querySelector('.close-btn').onclick=()=>o.remove();
       document.body.appendChild(o);
       return o;
     }
@@ -220,52 +209,48 @@
     }
 
     function openProfileEditor(){
-      const s = loadStore();
-      const p = s.profiles[username];
-      const o = openOverlay(createPfpEditor(p));
-      const canvas = o.querySelector('#pfpCanvas');
-      const ctx = canvas.getContext('2d');
-      let drawing = false, lastX = 0, lastY = 0, hasDrawn = false, loaded = false;
+      const s=loadStore(); const p=s.profiles[username];
+      const o=openOverlay(createPfpEditor(p));
+      const canvas=o.querySelector('#pfpCanvas'); const ctx=canvas.getContext('2d');
+      let drawing=false, lastX=0, lastY=0, hasDrawn=false, loaded=false;
       let tool = { color: '#ffffff', size: 10, eraser: false };
 
-      const drawBase = () => {
+      const drawBase=()=>{
         ctx.clearRect(0,0,canvas.width,canvas.height);
-        ctx.fillStyle = '#40444b';
-        ctx.beginPath();
-        ctx.arc(128,128,124,0,Math.PI*2);
-        ctx.fill();
+        ctx.fillStyle='#40444b';
+        ctx.beginPath(); ctx.arc(128,128,124,0,Math.PI*2); ctx.fill();
         if(p.profile_picture){
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
+          const img=new Image();
+          img.crossOrigin='anonymous';
+          img.onload=()=>{
             ctx.save();
             ctx.beginPath();
             ctx.arc(128,128,124,0,Math.PI*2);
             ctx.clip();
             ctx.drawImage(img,0,0,256,256);
             ctx.restore();
-            loaded = true;
+            loaded=true;
           };
-          img.src = p.profile_picture;
+          img.src=p.profile_picture;
         }
       };
 
       drawBase();
 
-      const point = e => {
-        const r = canvas.getBoundingClientRect();
-        const t = e.touches ? e.touches[0] : e;
-        return { x: (t.clientX - r.left) * (canvas.width / r.width), y: (t.clientY - r.top) * (canvas.height / r.height) };
+      const point=e=>{
+        const r=canvas.getBoundingClientRect();
+        const t=e.touches?e.touches[0]:e;
+        return {x:(t.clientX-r.left)*(canvas.width/r.width), y:(t.clientY-r.top)*(canvas.height/r.height)}
       };
 
-      const stroke = p2 => {
+      const stroke=(p2)=>{
         ctx.save();
         ctx.beginPath();
         ctx.arc(128,128,124,0,Math.PI*2);
         ctx.clip();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = tool.size;
+        ctx.lineCap='round';
+        ctx.lineJoin='round';
+        ctx.lineWidth=tool.size;
         ctx.strokeStyle = tool.eraser ? '#40444b' : tool.color;
         ctx.globalCompositeOperation = 'source-over';
         ctx.beginPath();
@@ -275,26 +260,23 @@
         ctx.restore();
       };
 
-      canvas.onmousedown = e => { drawing = true; ({x:lastX,y:lastY} = point(e)); };
-      canvas.onmousemove = e => { if(!drawing) return; stroke(point(e)); ({x:lastX,y:lastY} = point(e)); hasDrawn = true; };
-      window.onmouseup = () => drawing = false;
-      canvas.ontouchstart = e => { drawing = true; ({x:lastX,y:lastY} = point(e)); };
-      canvas.ontouchmove = e => { if(!drawing) return; stroke(point(e)); ({x:lastX,y:lastY} = point(e)); hasDrawn = true; };
-      window.ontouchend = () => drawing = false;
+      canvas.onmousedown=e=>{drawing=true; ({x:lastX,y:lastY}=point(e));};
+      canvas.onmousemove=e=>{ if(!drawing) return; stroke(point(e)); ({x:lastX,y:lastY}=point(e)); hasDrawn=true; };
+      window.onmouseup=()=>drawing=false;
+      canvas.ontouchstart=e=>{drawing=true; ({x:lastX,y:lastY}=point(e));};
+      canvas.ontouchmove=e=>{ if(!drawing) return; stroke(point(e)); ({x:lastX,y:lastY}=point(e)); hasDrawn=true; };
+      window.ontouchend=()=>drawing=false;
 
-      ['brushRed','brushOrange','brushYellow','brushGreen','brushBlue','brushPurple','brushWhite'].forEach(id => {
-        o.querySelector('#' + id).onclick = () => { tool.color = o.querySelector('#' + id).style.backgroundColor || '#fff'; tool.eraser = false; };
+      ['brushRed','brushOrange','brushYellow','brushGreen','brushBlue','brushPurple','brushWhite'].forEach(id=>{
+        o.querySelector('#'+id).onclick=()=>{ tool.color = o.querySelector('#'+id).style.backgroundColor || '#fff'; tool.eraser=false; };
       });
-
-      o.querySelector('#eraserBtn').onclick = () => { tool.eraser = true; };
-      o.querySelector('#clearPfp').onclick = () => { drawBase(); hasDrawn = false; loaded = false; };
-      o.querySelector('#loadPfp').onclick = () => o.querySelector('#pfpFile').click();
-
-      o.querySelector('#pfpFile').onchange = e => {
-        const f = e.target.files[0];
-        if(!f) return;
-        const img = new Image();
-        img.onload = () => {
+      o.querySelector('#eraserBtn').onclick=()=>{ tool.eraser=true; };
+      o.querySelector('#clearPfp').onclick=()=>{ drawBase(); hasDrawn=false; loaded=false; };
+      o.querySelector('#loadPfp').onclick=()=>o.querySelector('#pfpFile').click();
+      o.querySelector('#pfpFile').onchange=e=>{
+        const f=e.target.files[0]; if(!f) return;
+        const img=new Image();
+        img.onload=()=>{
           ctx.clearRect(0,0,256,256);
           ctx.save();
           ctx.beginPath();
@@ -302,79 +284,71 @@
           ctx.clip();
           ctx.drawImage(img,0,0,256,256);
           ctx.restore();
-          hasDrawn = true;
-          loaded = true;
+          hasDrawn=true; loaded=true;
         };
-        img.src = URL.createObjectURL(f);
+        img.src=URL.createObjectURL(f);
       };
 
-      o.querySelector('#cancelProfileBtn').onclick = () => o.remove();
-
-      o.querySelector('#saveProfileBtn').onclick = () => {
-        const newName = o.querySelector('#profileUsername').value.trim() || username;
+      o.querySelector('#cancelProfileBtn').onclick=()=>o.remove();
+      o.querySelector('#saveProfileBtn').onclick=()=>{
+        const newName=o.querySelector('#profileUsername').value.trim() || username;
         const dataURL = hasDrawn || loaded ? canvas.toDataURL('image/png') : p.profile_picture;
-        const s2 = loadStore();
-
-        s2.profiles[newName] = { ...s2.profiles[username], username: newName, profile_picture: dataURL };
-
-        if(newName !== username){
+        const s2=loadStore();
+        s2.profiles[newName] = { ...s2.profiles[username], username:newName, profile_picture:dataURL };
+        if(newName!==username){
           delete s2.profiles[username];
-          username = newName;
+          s2.messages.forEach(m=>{ if(m.username===username) m.username=newName; });
+          username=newName;
           localStorage.setItem('username', username);
         }
-
         saveStore(s2);
         o.remove();
-        if(currentChannel === 'stats') loadStats();
+        if(currentChannel==='stats') loadStats();
         else loadMessages(currentChannel);
         alert('Profile updated!');
       };
     }
 
     function switchChannel(channel){
-      currentChannel = channel;
+      currentChannel=channel;
       renderChannelHeader(channel);
-      $('messages').innerHTML = '';
-      loadMessages(channel);
+      $('messages').innerHTML='';
+      if(channel==='stats') loadStats();
+      else if(channel==='shop') loadShop();
+      else loadMessages(channel);
     }
 
     function loadShop(){
-      const s = loadStore();
-      const p = s.profiles[username];
-      $('messages').innerHTML = '';
-
-      const mk = (title, owned, buyText, playId, buyId, cost) => {
-        const div = document.createElement('div');
-        div.className = 'message';
-        div.innerHTML = owned
-          ? `<strong>${title}</strong><br><button class="shop-btn" id="${playId}">Play (Fullscreen)</button>`
-          : `<strong>${title}</strong><br>Cost: ${cost} coins<br><button class="shop-btn" id="${buyId}">${buyText}</button>`;
+      const s=loadStore();
+      const p=s.profiles[username];
+      $('messages').innerHTML='';
+      const mk=(title,owned,buyText,playId,buyId,cost)=>{
+        const div=document.createElement('div');
+        div.className='message';
+        div.innerHTML = owned ? `<strong>${title}</strong><br><button class="shop-btn" id="${playId}">Play (Fullscreen)</button>` : `<strong>${title}</strong><br>Cost: ${cost} coins<br><button class="shop-btn" id="${buyId}">${buyText}</button>`;
         $('messages').appendChild(div);
       };
-
-      mk('Snake Game', p.owned_snake, 'Buy Snake (25 coins)', 'playSnakeBtn', 'buySnakeBtn', 25);
-      mk('Slope Game', p.owned_slope, 'Buy Slope (50 coins)', 'playSlopeBtn', 'buySlopeBtn', 50);
-
+      mk(' Snake Game', p.owned_snake, 'Buy Snake (25 coins)', 'playSnakeBtn', 'buySnakeBtn', 25);
+      mk(' Slope Game', p.owned_slope, 'Buy Slope (50 coins)', 'playSlopeBtn', 'buySlopeBtn', 50);
       if(p.owned_snake) $('playSnakeBtn').onclick = openSnakeFullscreen;
-      else $('buySnakeBtn').onclick = () => {
-        const s2 = loadStore();
-        const p2 = s2.profiles[username];
-        if(p2.coins < 25) return alert('You need 25 coins to buy Snake!');
-        p2.coins -= 25;
-        p2.owned_snake = true;
+      else $('buySnakeBtn').onclick = ()=>{
+        const s2=loadStore();
+        const p2=s2.profiles[username];
+        if(p2.coins<25) return alert('You need 25 coins to buy Snake!');
+        p2.coins-=25;
+        p2.owned_snake=true;
         saveStore(s2);
         alert('You bought Snake!');
         loadShop();
         openSnakeFullscreen();
       };
-
       if(p.owned_slope) $('playSlopeBtn').onclick = openSlopeFullscreen;
-      else $('buySlopeBtn').onclick = () => {
-        const s2 = loadStore();
-        const p2 = s2.profiles[username];
-        if(p2.coins < 50) return alert('You need 50 coins to buy Slope!');
-        p2.coins -= 50;
-        p2.owned_slope = true;
+      else $('buySlopeBtn').onclick = ()=>{
+        const s2=loadStore();
+        const p2=s2.profiles[username];
+        if(p2.coins<50) return alert('You need 50 coins to buy Slope!');
+        p2.coins-=50;
+        p2.owned_slope=true;
         saveStore(s2);
         alert('You bought Slope!');
         loadShop();
@@ -385,26 +359,18 @@
     function openSnakeFullscreen(){ openOverlay(`<iframe src="https://frogdafish.github.io/Snek"></iframe>`); }
     function openSlopeFullscreen(){ openOverlay(`<iframe src="slope.html"></iframe>`); }
 
-    function attachRealtime(){
-      supabaseClient
-        .channel('messages-feed')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-          if(payload.new.channel === currentChannel && currentChannel !== 'stats' && currentChannel !== 'shop'){
-            loadMessages(currentChannel);
-          }
-        })
-        .subscribe();
+    $('sendBtn').addEventListener('click', sendMessage);
+    $('messageInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendMessage(); });
+    $('editProfileBtn').addEventListener('click', openProfileEditor);
+    document.querySelectorAll('.channel').forEach(el=>el.addEventListener('click', ()=>switchChannel(el.dataset.channel)));
+
+    async function init(){
+      renderChannelHeader('general');
+      ensureProfile();
+      await loadMessages('general');
     }
 
-    $('sendBtn').addEventListener('click', sendMessage);
-    $('messageInput').addEventListener('keydown', e => { if(e.key === 'Enter') sendMessage(); });
-    $('editProfileBtn').addEventListener('click', openProfileEditor);
-    document.querySelectorAll('.channel').forEach(el => el.addEventListener('click', () => switchChannel(el.dataset.channel)));
-
-    renderChannelHeader('general');
-    ensureProfile();
-    loadMessages('general');
-    attachRealtime();
+    init();
   </script>
 </body>
 </html>
