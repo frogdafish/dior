@@ -186,7 +186,7 @@
     async function addMessage(user, text, avatarUrl=null){
       const div=document.createElement('div');
       div.className='message';
-      const safe = String(text).replace(/\\\\n/g,'<br>');
+      const safe = String(text).replace(/\\n/g,'<br>');
       div.innerHTML=`<div class="message-row"><img class="avatar" src="${avatarUrl||await avatarFor(user)}" alt="avatar"><div class="message-content"><span class="username">${user}</span> ${safe}</div></div>`;
       const img = div.querySelector('.avatar');
       setAvatarFallback(img, user);
@@ -225,7 +225,7 @@
       if (token !== loadToken || channel !== currentChannel) return;
 
       messagesEl.innerHTML = msgs.map(m => {
-        const safe = String(m.text).replace(/\\\\n/g, '<br>');
+        const safe = String(m.text).replace(/\\n/g, '<br>');
         return `
       <div class="message">
         <div class="message-row">
@@ -292,39 +292,35 @@
       const messagesEl = $('messages');
       messagesEl.innerHTML = '';
 
-      // Games Chat thread at top
       const top = document.createElement('div');
       top.className = 'thread-topbar';
-      top.innerHTML = `<button id="gamesChatBtn" class="thread-create-btn">🎮 Games Chat</button>`;
+      top.innerHTML = `<button id="gamesChatBtn" class="thread-create-btn"> Games Chat</button>`;
       messagesEl.appendChild(top);
 
-      // Games grid
       const gamesGrid = document.createElement('div');
       gamesGrid.className = 'game-grid';
       gamesGrid.innerHTML = `
         <div class="game-card">
-          <h4>🐍 Snake Game</h4>
+          <h4> Snake Game</h4>
           <button class="shop-btn" id="playSnakeBtn">Play (Fullscreen)</button>
         </div>
         <div class="game-card">
-          <h4>📈 Slope Game</h4>
+          <h4> Slope Game</h4>
           <button class="shop-btn" id="playSlopeBtn">Play (Fullscreen)</button>
         </div>
         <div class="game-card">
-          <h4>🎯 Bart Blast</h4>
+          <h4> Bart Blast</h4>
           <button class="shop-btn" id="playBartBtn">Play (Fullscreen)</button>
         </div>
         <div class="game-card">
-          <h4>⚽ Super Liquid Soccer</h4>
+          <h4> Super Liquid Soccer</h4>
           <button class="shop-btn" id="playSlsBtn">Play (Free)</button>
         </div>
       `;
       messagesEl.appendChild(gamesGrid);
 
-      // Load profile to check ownership (for future coin purchases)
       const p = await loadProfile(username);
-     
-      // Snake game button logic
+
       if(p.owned_snake) {
         $('playSnakeBtn').onclick = openSnakeFullscreen;
       } else {
@@ -340,7 +336,6 @@
         };
       }
 
-      // Slope game button logic
       if(p.owned_slope) {
         $('playSlopeBtn').onclick = openSlopeFullscreen;
       } else {
@@ -356,7 +351,6 @@
         };
       }
 
-      // Bart Blast button logic
       if(p.owned_bartblast) {
         $('playBartBtn').onclick = openBartFullscreen;
       } else {
@@ -373,8 +367,6 @@
       }
 
       $('playSlsBtn').onclick = openSuperLiquidSoccerFullscreen;
-
-      // Games Chat button opens gaming threads
       $('gamesChatBtn').onclick = () => loadGamingThreads();
 
       if (token !== loadToken || currentChannel !== 'gaming') return;
@@ -431,7 +423,7 @@
       top.innerHTML = `
         <button id="backToGamingThreadsBtn" class="thread-back-btn">← Back</button>
         ${isCreator ? `<button id="deleteGamingThreadBtn" class="thread-delete-btn">Delete</button>` : ''}
-        <button id="gamingThreadTitleBtn" class="thread-create-btn" disabled>🎮 ${thread.title}</button>
+        <button id="gamingThreadTitleBtn" class="thread-create-btn" disabled>${thread.title}</button>
       `;
       $('messages').appendChild(top);
 
@@ -470,7 +462,7 @@
           <div class="message-row">
             <img class="avatar" src="${avatars[m.username]}" alt="avatar">
             <div class="message-content">
-              <span class="username">${m.username}</span> ${String(m.text).replace(/\\\\n/g, '<br>')}
+              <span class="username">${m.username}</span> ${String(m.text).replace(/\\n/g, '<br>')}
             </div>
           </div>`;
         setAvatarFallback(div.querySelector('.avatar'), m.username);
@@ -537,7 +529,7 @@
           <div class="message-row">
             <img class="avatar" src="${avatars[m.username]}" alt="avatar">
             <div class="message-content">
-              <span class="username">${m.username}</span> ${String(m.text).replace(/\\\\n/g, '<br>')}
+              <span class="username">${m.username}</span> ${String(m.text).replace(/\\n/g, '<br>')}
             </div>
           </div>`;
         setAvatarFallback(div.querySelector('.avatar'), m.username);
@@ -552,16 +544,16 @@
     }
 
     async function sendMessage(){
-      const text=$('messageInput').value.trim();
+      const text = $('messageInput').value.trim();
       if(!text) return;
       if(currentChannel==='stats' || currentChannel==='shop') return alert('You cannot send messages in this channel!');
       const profile = await loadProfile(username);
 
       if (!profile?.is_admin && (profile?.muted_until || profile?.muted === true)) {
-        return alert(`You are muted!\\\\n\\\\nReason: ${profile.mute_reason || 'No reason specified'}`);
+        return alert(`You are muted!\n\nReason: ${profile.mute_reason || 'No reason specified'}`);
       }
 
-      if ((currentChannel === 'suggestions' && currentThreadId) || (currentChannel === 'gaming' && currentThreadId)) {
+      if (currentChannel === 'gaming' && currentThreadId) {
         const message = {
           channel: currentChannel,
           thread_id: currentThreadId,
@@ -573,11 +565,23 @@
         const { error } = await supabase.from('messages').insert(message);
         if (error) return alert('Message failed to send.');
         $('messageInput').value = '';
-        if (currentChannel === 'suggestions') {
-          await openSuggestionThread(currentThread);
-        } else {
-          await openGamingThread(currentThread);
-        }
+        await openGamingThread(currentThread);
+        return;
+      }
+
+      if (currentChannel === 'suggestions' && currentThreadId) {
+        const message = {
+          channel: currentChannel,
+          thread_id: currentThreadId,
+          username,
+          text,
+          created_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase.from('messages').insert(message);
+        if (error) return alert('Message failed to send.');
+        $('messageInput').value = '';
+        await openSuggestionThread(currentThread);
         return;
       }
 
@@ -603,7 +607,7 @@
       $('messageInput').value='';
 
       const avatar = await avatarFor(username);
-      const safe = String(text).replace(/\\\\n/g, '<br>');
+      const safe = String(text).replace(/\\n/g, '<br>');
       const div = document.createElement('div');
       div.className = 'message';
       div.innerHTML = `
@@ -628,7 +632,7 @@
     async function loadShop(token = loadToken){
       const p = await loadProfile(username);
       if (token !== loadToken || currentChannel !== 'shop') return;
-      $('messages').innerHTML = '<div class="message"><div style="text-align:center;color:#b9bbbe">🛒 Games are now in #gaming! Shop coming soon...</div></div>';
+      $('messages').innerHTML = '<div class="message"><div style="text-align:center;color:#b9bbbe"> Games are now in #gaming! Shop coming soon...</div></div>';
     }
 
     function openOverlay(innerHTML){
@@ -642,21 +646,19 @@
 
     function parseRGB(colorStr) {
       if (!colorStr || !colorStr.includes('rgb')) return {r:255, g:255, b:255};
-      const match = colorStr.match(/rgb\\\\((\\\\d+),(\\\\d+),(\\\\d+)\\\\)/);
+      const match = colorStr.match(/rgb\((\d+),(\d+),(\d+)\)/);
       return { r: parseInt(match?.[1] || '255'), g: parseInt(match?.[2] || '255'), b: parseInt(match?.[3] || '255') };
     }
 
-    // Profile editor code remains the same (omitted for brevity)
-    function createPfpEditor(profile){ /* ... same as original ... */ }
-    function openProfileEditor(){ /* ... same as original ... */ }
+    function createPfpEditor(profile){ }
+    function openProfileEditor(){ }
 
     function openSnakeFullscreen(){ openOverlay(`<iframe src="https://frogdafish.github.io/Snek"></iframe>`); }
     function openSlopeFullscreen(){ openOverlay(`<iframe src="slope.html"></iframe>`); }
     function openBartFullscreen(){ openOverlay(`<iframe src="bartblast.html"></iframe>`); }
     function openSuperLiquidSoccerFullscreen(){ openOverlay(`<iframe src="https://blueskywrld.github.io/game3/"></iframe>`); }
 
-    // Admin panel code remains the same (omitted for brevity)
-    async function openAdminPanel(){ /* ... same as original ... */ }
+    async function openAdminPanel(){ }
 
     async function openCreateThreadModal(){
       const channelName = currentChannel === 'gaming' ? 'Gaming' : 'Suggestion';
@@ -681,7 +683,7 @@
       o.querySelector('#cancelThreadBtn').onclick = () => o.remove();
 
       o.querySelector('#createThreadBtn').onclick = async () => {
-        const title = o.querySelector('#threadTitle').value.trim().replace(/\\\\s+/g, ' ');
+        const title = o.querySelector('#threadTitle').value.trim().replace(/\s+/g, ' ');
         const description = o.querySelector('#threadDesc').value.trim();
 
         if (!title) return alert('Title is required.');
