@@ -32,14 +32,14 @@
     .overlay-box{width:min(980px,96vw);height:min(680px,92vh);background:#1e1f22;border-radius:12px;position:relative;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.35)}
     .overlay-box iframe{position:absolute;inset:0;width:100%;height:100%;border:none}
     .close-btn{position:absolute;top:10px;right:10px;z-index:10001;width:40px;height:40px;border-radius:50%;border:none;background:#7289da;color:#fff;font-size:20px}
-    .admin-list{padding:18px;color:#fff;overflow:auto;height:100%;box-sizing:border-box}
-    .admin-user{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;margin-bottom:10px;background:#2f3136;border:1px solid #202225;border-radius:8px}
-    .admin-user-info{display:flex;flex-direction:column;gap:4px}
-    .admin-user-name{font-weight:bold;color:#fff}
-    .admin-user-stats{font-size:13px;color:#b9bbbe}
-    .admin-user-actions{display:flex;gap:8px;flex-wrap:wrap}
-    .admin-mute-btn{background:#ff6b6b}
-    .admin-unmute-btn{background:#43b581}
+    .game-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;margin:20px 0}
+    .game-card{padding:15px;background:#2f3136;border:1px solid #202225;border-radius:8px;text-align:center}
+    .game-card h4{margin:0 0 10px;font-size:16px;color:#fff}
+    .game-card button{width:100%;margin:5px 0}
+    .games-header{padding:20px;background:#2f3136;border-bottom:1px solid #202225;text-align:center;font-size:18px;font-weight:bold;color:#fff;margin-bottom:15px}
+    .game-chat-btn{background:#5865f2;padding:8px 16px !important;font-size:14px !important;border-radius:6px !important;margin:10px auto !important;display:block;width:120px}
+    .game-chat-btn:hover{background:#4752c4 !important}
+    .back-btn{background:#7289da;padding:8px 16px !important;font-size:14px !important;border-radius:6px !important;margin:15px auto !important;display:block;width:140px}
   </style>
 </head>
 <body>
@@ -48,6 +48,7 @@
     <div class="channel" data-channel="general"># general</div>
     <div class="channel" data-channel="gaming"># gaming</div>
     <div class="channel" data-channel="coding"># coding</div>
+    <div class="channel" data-channel="suggestions"># suggestions</div>
     <div class="channel" data-channel="adaminchat" id="adminChatChannel" style="display:none;"># ad da min chat</div>
     <div class="channel" data-channel="stats"># stats</div>
     <div class="channel" data-channel="shop"># shop</div>
@@ -62,7 +63,6 @@
       <input id="messageInput" placeholder="Message #general" />
       <button id="sendBtn">Send</button>
     </div>
-    <div id="typingIndicator" class="typing-indicator"></div>
   </div>
 
   <script type="module">
@@ -74,38 +74,21 @@
     );
 
     const $ = id => document.getElementById(id);
-    let currentChannel = 'general';
-    let username = localStorage.getItem('username') || '';
-    let loadToken = 0;
+    let currentChannel = 'general', currentThreadId = null, loadToken = 0, username = '';
     const avatarCache = new Map();
 
-    const defaultProfile = {
-      xp: 0,
-      level: 1,
-      coins: 0,
-      profile_picture: null,
-      muted_until: null,
-      mute_reason: null,
-      muted: false,
-      owned_snake: false,
-      owned_slope: false,
-      owned_bartblast: false,
-      is_admin: false,
-      pfp_brush_color: 'rgb(255,255,255)',
-      pfp_brush_width: 10,
-      pfp_bg_color: '#40444b'
-    };
+    const defaultProfile = {xp:0,level:1,coins:0,profile_picture:null,muted:false,owned_snake:false,owned_slope:false,owned_bartblast:false,owned_sls:true,is_admin:false};
 
+    username = localStorage.getItem('username') || '';
     if (!username) {
       while (!username) username = prompt('Enter username:');
       localStorage.setItem('username', username);
       await supabase.from('profiles').upsert({ username, ...defaultProfile });
     }
 
-    const getFallbackAvatar = n => `https://ui-avatars.com/api/?name=${encodeURIComponent(n)}&background=7289da&color=fff&rounded=true&size=64`;
-    const setAvatarFallback = (img, n) => img.onerror = () => { img.onerror = null; img.src = getFallbackAvatar(n); };
+    const fallback = n => `https://ui-avatars.com/api/?name=${encodeURIComponent(n)}&background=7289da&color=fff&rounded=true&size=64`;
 
-    async function loadProfile(name) {
+    async function getProfile(name) {
       const { data } = await supabase.from('profiles').select('*').eq('username', name).single();
       return data || {};
     }
@@ -114,380 +97,174 @@
       await supabase.from('profiles').upsert(profile);
     }
 
-    async function ensureProfile(){
-      await supabase.from('profiles').upsert({ username, ...defaultProfile });
-    }
-
-    async function refreshAdminVisibility() {
-      const profile = await loadProfile(username);
-      const btn = $('adminChatChannel');
-      if (!btn) return;
-      btn.style.display = profile?.is_admin === true ? 'block' : 'none';
-    }
-
-    async function refreshAdminButton() {
-      const profile = await loadProfile(username);
-      const btn = $('adminPanelBtn');
-      if (!btn) return;
-      btn.style.display = profile?.is_admin === true ? 'block' : 'none';
-    }
-
-    async function getAvatars(usernames) {
-      const unique = [...new Set(usernames.filter(Boolean))];
-      const missing = unique.filter(name => !avatarCache.has(name));
-
-      if (missing.length) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('username, profile_picture')
-          .in('username', missing);
-
-        const rows = data || [];
-        for (const name of missing) {
-          const profile = rows.find(p => p.username === name);
-          avatarCache.set(name, profile?.profile_picture || getFallbackAvatar(name));
-        }
-      }
-
-      const out = {};
-      for (const name of unique) out[name] = avatarCache.get(name) || getFallbackAvatar(name);
-      return out;
-    }
-
-    async function avatarFor(name){
+    async function getAvatar(name) {
       if (avatarCache.has(name)) return avatarCache.get(name);
-      const profile = await loadProfile(name);
-      const avatar = profile?.profile_picture || getFallbackAvatar(name);
-      avatarCache.set(name, avatar);
-      return avatar;
+      const p = await getProfile(name);
+      const url = p.profile_picture || fallback(name);
+      avatarCache.set(name, url);
+      return url;
     }
 
-    async function addMessage(user, text, avatarUrl=null){
-      const div=document.createElement('div');
-      div.className='message';
-      const safe = String(text).replace(/\\\\\\\\n/g,'<br>');
-      div.innerHTML=`<div class="message-row"><img class="avatar" src="${avatarUrl||await avatarFor(user)}" alt="avatar"><div class="message-content"><span class="username">${user}</span> ${safe}</div></div>`;
-      const img = div.querySelector('.avatar');
-      setAvatarFallback(img, user);
-      $('messages').appendChild(div);
-      $('messages').scrollTop = $('messages').scrollHeight;
-    }
-
-    function renderChannelHeader(channel){
-      $('channelName').textContent = channel === 'stats' ? '# stats' : channel === 'shop' ? '# shop' : channel === 'adaminchat' ? '# ad da min chat' : `# ${channel}`;
-      $('messageInput').placeholder = (channel === 'stats' || channel === 'shop') ? '' : `Message #${channel}`;
-    }
-
-    async function loadMessages(channel, token = ++loadToken){
-      const messagesEl = $('messages');
-      messagesEl.innerHTML = '';
-
-      const { data: msgs } = await supabase
-        .from('messages')
-        .select('channel,username,text,created_at')
-        .eq('channel', channel)
-        .order('created_at', { ascending: true })
-        .limit(50);
-
-      if (token !== loadToken || channel !== currentChannel) return;
-
-      if (!msgs || !msgs.length) {
-        messagesEl.innerHTML = '';
-        await addMessage('System', 'No messages yet.');
-        return;
-      }
-
-      const avatars = await getAvatars(msgs.map(m => m.username));
-
-      if (token !== loadToken || channel !== currentChannel) return;
-
-      messagesEl.innerHTML = msgs.map(m => {
-        const safe = String(m.text).replace(/\\\\\\\\n/g, '<br>');
-        return `
-      <div class="message">
-        <div class="message-row">
-          <img class="avatar" src="${avatars[m.username]}" alt="avatar">
-          <div class="message-content">
-            <span class="username">${m.username}</span> ${safe}
-          </div>
-        </div>
-      </div>`;
-      }).join('');
-
-      messagesEl.querySelectorAll('.avatar').forEach((img, i) => {
-        setAvatarFallback(img, msgs[i].username);
-      });
-
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    async function sendMessage(){
-      const text=$('messageInput').value.trim();
-      if(!text) return;
-      if(currentChannel==='stats' || currentChannel==='shop') return alert('You cannot send messages in this channel!');
-      const profile = await loadProfile(username);
-      
-      // Allow admins to bypass mute
-      if (!profile?.is_admin && (profile?.muted_until || profile?.muted === true)) {
-        return alert(`You are muted!\\n\\nReason: ${profile.mute_reason || 'No reason specified'}`);
-      }
-
-      const message = {
-        channel: currentChannel,
-        username,
-        text,
-        created_at: new Date().toISOString()
-      };
-
-      const { error } = await supabase.from('messages').insert(message);
-      if (error) return alert('Message failed to send.');
-
-      $('messageInput').value='';
-
-      const avatar = await avatarFor(username);
-      const safe = String(text).replace(/\\\\\\\\n/g, '<br>');
+    async function addMessage(user, text, avatarUrl = null) {
+      const avatar = avatarUrl || await getAvatar(user);
+      const safeText = String(text).replace(/\\n/g, '<br>');
       const div = document.createElement('div');
       div.className = 'message';
       div.innerHTML = `
         <div class="message-row">
-          <img class="avatar" src="${avatar}" alt="avatar">
+          <img class="avatar" src="${avatar}" alt="avatar" onerror="this.onerror=null; this.src='${fallback(user)}'">
           <div class="message-content">
-            <span class="username">${username}</span> ${safe}
+            <span class="username">${user}</span> ${safeText}
           </div>
         </div>`;
-      setAvatarFallback(div.querySelector('.avatar'), username);
       $('messages').appendChild(div);
       $('messages').scrollTop = $('messages').scrollHeight;
     }
 
-    async function loadStats(token = loadToken){
-      const p = await loadProfile(username);
-      if (token !== loadToken || currentChannel !== 'stats') return;
-      $('messages').innerHTML='';
-      await addMessage('System', `${p.username}<br><strong>Level:</strong> ${p.level}<br><strong>XP:</strong> ${p.xp}<br><strong>XP to next level:</strong> ${Math.max((p.level||1)*100-(p.xp||0),0)}<br><strong>Coins:</strong> ${p.coins}<br><strong>Owns Snake:</strong> ${p.owned_snake ? 'Yes' : 'No'}<br><strong>Owns Slope:</strong> ${p.owned_slope ? 'Yes' : 'No'}<br><strong>Owns Bart Blast:</strong> ${p.owned_bartblast ? 'Yes' : 'No'}<br><strong>Admin:</strong> ${p.is_admin ? 'Yes' : 'No'}`, await avatarFor(p.username));
+    function setHeader(channel, thread = null) {
+      const names = {stats: '# stats', shop: '# shop', suggestions: '# suggestions', gaming: '# gaming', adaminchat: '# ad da min chat'};
+      $('channelName').textContent = thread ? `${names[channel] || `# ${channel}`} → ${thread}` : names[channel] || `# ${channel}`;
+      $('messageInput').placeholder = ['stats','shop'].includes(channel) ? '' : `Message ${thread ? `${thread} in #${channel}` : `#${channel}`}`;
+      $('messageInput').disabled = false;
+      $('sendBtn').style.display = 'inline-block';
     }
 
-    async function loadShop(token = loadToken){
-      const p = await loadProfile(username);
-      if (token !== loadToken || currentChannel !== 'shop') return;
-      $('messages').innerHTML='';
-      const mk=(title,owned,buyText,playId,buyId,cost)=>{
-        const div=document.createElement('div');
-        div.className='message';
-        div.innerHTML = owned
-          ? `<strong>${title}</strong><br><button class="shop-btn" id="${playId}">Play (Fullscreen)</button>`
-          : `<strong>${title}</strong><br>Cost: ${cost} coins<br><button class="shop-btn" id="${buyId}">${buyText}</button>`;
-        $('messages').appendChild(div);
-      };
-      mk('Snake Game', p.owned_snake, 'Buy Snake (25 coins)', 'playSnakeBtn', 'buySnakeBtn', 25);
-      mk('Slope Game', p.owned_slope, 'Buy Slope (50 coins)', 'playSlopeBtn', 'buySlopeBtn', 50);
-      mk('Bart Blast', p.owned_bartblast, 'Buy Bart Blast (75 coins)', 'playBartBtn', 'buyBartBtn', 75);
-
-      if(p.owned_snake) $('playSnakeBtn').onclick = openSnakeFullscreen; else $('buySnakeBtn').onclick = async ()=>{ const p2=await loadProfile(username); if((p2.coins||0)<25) return alert('You need 25 coins to buy Snake!'); p2.coins-=25; p2.owned_snake=true; await saveProfile(p2); alert('You bought Snake!'); await loadShop(); openSnakeFullscreen(); };
-      if(p.owned_slope) $('playSlopeBtn').onclick = openSlopeFullscreen; else $('buySlopeBtn').onclick = async ()=>{ const p2=await loadProfile(username); if((p2.coins||0)<50) return alert('You need 50 coins to buy Slope!'); p2.coins-=50; p2.owned_slope=true; await saveProfile(p2); alert('You bought Slope!'); await loadShop(); openSlopeFullscreen(); };
-      if(p.owned_bartblast) $('playBartBtn').onclick = openBartFullscreen; else $('buyBartBtn').onclick = async ()=>{ const p2=await loadProfile(username); if((p2.coins||0)<75) return alert('You need 75 coins to buy Bart Blast!'); p2.coins-=75; p2.owned_bartblast=true; await saveProfile(p2); alert('You bought Bart Blast!'); await loadShop(); openBartFullscreen(); };
-    }
-
-    function openOverlay(innerHTML){
-      const old=document.querySelector('.overlay'); if(old) old.remove();
-      const o=document.createElement('div'); o.className='overlay';
-      o.innerHTML=`<div class="overlay-box"><button class="close-btn"></button>${innerHTML}</div>`;
-      o.querySelector('.close-btn').onclick=()=>o.remove();
-      document.body.appendChild(o);
-      return o;
-    }
-
-    function parseRGB(colorStr) {
-      if (!colorStr || !colorStr.includes('rgb')) return {r:255, g:255, b:255};
-      const match = colorStr.match(/rgb\\\\\((\\\\d+),(\\\\d+),(\\\\d+)\\\\\)/);
-      return { r: parseInt(match?.[1] || '255'), g: parseInt(match?.[2] || '255'), b: parseInt(match?.[3] || '255') };
-    }
-
-    function createPfpEditor(profile){
-      const rgb = parseRGB(profile.pfp_brush_color);
-      return `
-        <div style="padding:18px;color:#fff">
-          <h3 style="margin-top:0">Edit Profile</h3>
-          <div class="profile-field"><label>Username</label><input id="profileUsername" type="text" value="${profile.username}"></div>
-          <div class="profile-field"><label>PFP Background Color</label><input id="bgColorPicker" type="color" value="${profile.pfp_bg_color || '#40444b'}"></div>
-          <div class="profile-field">
-            <label>Brush Color (RGB)</label>
-            <div class="rgb-row">
-              <input id="rInput" type="number" min="0" max="255" value="${rgb.r}">
-              <input id="gInput" type="number" min="0" max="255" value="${rgb.g}">
-              <input id="bInput" type="number" min="0" max="255" value="${rgb.b}">
-              <button id="applyRGBBtn">Apply</button>
-            </div>
-          </div>
-          <div class="profile-field"><label>Brush Size</label><input id="brushSize" type="range" min="1" max="40" value="${profile.pfp_brush_width || 10}"><span id="brushSizeValue" style="font-size:12px;color:#b9bbbe;margin-left:10px">${profile.pfp_brush_width || 10}px</span></div>
-          <div class="profile-field">
-            <label>Draw your PFP</label>
-            <canvas id="pfpCanvas" width="256" height="256" style="width:180px;height:180px;border-radius:50%;background:#40444b;border:2px solid #7289da;display:block"></canvas>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-              <button id="clearPfp" class="cancel-btn">Clear</button>
-              <button id="loadPfp">Load Image</button>
-              <input id="pfpFile" type="file" accept="image/*" hidden>
-            </div>
-          </div>
-          <div class="profile-actions"><button id="saveProfileBtn">Save</button><button id="cancelProfileBtn" class="cancel-btn">Cancel</button></div>
+    async function loadGaming(token = ++loadToken) {
+      if (token !== loadToken || currentChannel !== 'gaming') return;
+      
+      const p = await getProfile(username);
+      $('messages').innerHTML = `
+        <div class="games-header">🎮 Play Games</div>
+        <button class="game-chat-btn" id="gameChatBtn">Game Chat</button>
+        <div class="game-grid">
+          ${gameCard('🐍 Snake Game', 'playSnakeBtn', 25, 'owned_snake')}
+          ${gameCard('📈 Slope Game', 'playSlopeBtn', 50, 'owned_slope')}
+          ${gameCard('🎯 Bart Blast', 'playBartBtn', 75, 'owned_bartblast')}
+          ${gameCard('⚽ Super Liquid Soccer', 'playSlsBtn', 0, 'owned_sls', true)}
         </div>`;
+
+      setupGameBtns(p);
+      $('gameChatBtn').onclick = () => enterGamesChat();
     }
 
-    function openProfileEditor(){
-      loadProfile(username).then(p => {
-        const o = openOverlay(createPfpEditor(p));
-        const canvas = o.querySelector('#pfpCanvas');
-        const ctx = canvas.getContext('2d');
-        const bgPicker = o.querySelector('#bgColorPicker');
-        const rEl = o.querySelector('#rInput');
-        const gEl = o.querySelector('#gInput');
-        const bEl = o.querySelector('#bInput');
-        const brushSizeSlider = o.querySelector('#brushSize');
-        const brushSizeValue = o.querySelector('#brushSizeValue');
-        let drawing = false, brushColor = p.pfp_brush_color || 'rgb(255,255,255)', lineWidth = p.pfp_brush_width || 10, loaded = false, lastPoint = null;
-        const clamp = v => Math.max(0, Math.min(255, parseInt(v || 0, 10)));
-        const getBrush = () => `rgb(${clamp(rEl.value)},${clamp(gEl.value)},${clamp(bEl.value)})`;
-        const circleClip = () => { ctx.beginPath(); ctx.arc(128, 128, 124, 0, Math.PI * 2); ctx.clip(); };
-        const drawBase = () => {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = bgPicker.value;
-          ctx.beginPath();
-          ctx.arc(128, 128, 124, 0, Math.PI * 2);
-          ctx.fill();
-          if (p.profile_picture && !loaded) {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => { ctx.save(); circleClip(); ctx.drawImage(img, 0, 0, 256, 256); ctx.restore(); loaded = true; };
-            img.onerror = () => loaded = true;
-            img.src = p.profile_picture;
-          }
-        };
-        drawBase();
-        bgPicker.addEventListener('input', drawBase);
-        [rEl,gEl,bEl].forEach(el => el.addEventListener('input', () => brushColor = getBrush()));
-        o.querySelector('#applyRGBBtn').onclick = () => brushColor = getBrush();
-        brushSizeSlider.addEventListener('input', () => { lineWidth = parseInt(brushSizeSlider.value, 10); brushSizeValue.textContent = `${lineWidth}px`; });
-        const getPoint = e => { const rect = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x:(t.clientX-rect.left)*(canvas.width/rect.width), y:(t.clientY-rect.top)*(canvas.height/rect.height) }; };
-        const strokeLine = point => { if (!drawing || !lastPoint) return; ctx.save(); circleClip(); ctx.beginPath(); ctx.moveTo(lastPoint.x, lastPoint.y); ctx.lineTo(point.x, point.y); ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineWidth=lineWidth; ctx.strokeStyle=brushColor; ctx.stroke(); ctx.restore(); lastPoint = point; };
-        const startStroke = point => { drawing = true; lastPoint = point; ctx.save(); circleClip(); ctx.beginPath(); ctx.moveTo(point.x, point.y); ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineWidth=lineWidth; ctx.strokeStyle=brushColor; ctx.stroke(); ctx.restore(); };
-        canvas.onmousedown = e => { e.preventDefault(); startStroke(getPoint(e)); loaded = true; };
-        canvas.onmousemove = e => { if (!drawing) return; strokeLine(getPoint(e)); };
-        document.onmouseup = () => { drawing = false; lastPoint = null; };
-        canvas.onmouseleave = () => { drawing = false; lastPoint = null; };
-        canvas.ontouchstart = e => { e.preventDefault(); startStroke(getPoint(e)); loaded = true; };
-        canvas.ontouchmove = e => { e.preventDefault(); strokeLine(getPoint(e)); };
-        document.ontouchend = () => { drawing = false; lastPoint = null; };
-        o.querySelector('#clearPfp').onclick = () => { loaded = false; drawBase(); };
-        o.querySelector('#loadPfp').onclick = () => o.querySelector('#pfpFile').click();
-        o.querySelector('#pfpFile').onchange = e => { const file = e.target.files[0]; if (!file) return; const img = new Image(); img.onload = () => { ctx.clearRect(0, 0, 256, 256); ctx.save(); circleClip(); ctx.drawImage(img, 0, 0, 256, 256); ctx.restore(); loaded = true; }; img.src = URL.createObjectURL(file); };
-        o.querySelector('#cancelProfileBtn').onclick = () => o.remove();
-        o.querySelector('#saveProfileBtn').onclick = async () => {
-          const newName = o.querySelector('#profileUsername').value.trim() || username;
-          const dataURL = loaded ? canvas.toDataURL('image/png') : p.profile_picture;
-          const s2 = await loadProfile(username);
-          const updated = { ...s2, username: newName, profile_picture: dataURL, pfp_bg_color: bgPicker.value, pfp_brush_color: brushColor, pfp_brush_width: lineWidth };
-          if (newName !== username) {
-            await supabase.from('profiles').delete().eq('username', username);
-            await supabase.from('profiles').upsert(updated);
-            await supabase.from('messages').update({ username: newName }).eq('username', username);
-            username = newName;
-            localStorage.setItem('username', username);
-          } else {
-            await saveProfile(updated);
-          }
-          o.remove();
-          await refreshAdminButton();
-          await refreshAdminVisibility();
-          if (currentChannel === 'stats') await loadStats(); else if (currentChannel === 'shop') await loadShop(); else await loadMessages(currentChannel);
-          alert('Profile updated!');
-        };
+    function gameCard(title, btnId, price, ownedKey, free = false) {
+      return `<div class="game-card"><h4>${title}</h4><button class="shop-btn" id="${btnId}">${free?'Play (Free)':'Buy ('+price+' coins)'}</button></div>`;
+    }
+
+    function setupGameBtns(p) {
+      const games = [
+        {id: 'playSnakeBtn', owned: 'owned_snake', price: 25, open: () => openFrame('https://frogdafish.github.io/Snek')},
+        {id: 'playSlopeBtn', owned: 'owned_slope', price: 50, open: () => openFrame('slope.html')},
+        {id: 'playBartBtn', owned: 'owned_bartblast', price: 75, open: () => openFrame('bartblast.html')},
+        {id: 'playSlsBtn', owned: 'owned_sls', price: 0, open: () => openFrame('https://blueskywrld.github.io/game3/')}
+      ];
+
+      games.forEach(g => {
+        const btn = $(g.id);
+        if (btn && (p[g.owned] || g.price === 0)) {
+          btn.textContent = 'Play (Fullscreen)';
+          btn.onclick = g.open;
+        } else if (btn) {
+          btn.onclick = () => buyGame(g.id, g.price, g.owned);
+        }
       });
     }
 
-    function openSnakeFullscreen(){ openOverlay(`<iframe src="https://frogdafish.github.io/Snek"></iframe>`); }
-    function openSlopeFullscreen(){ openOverlay(`<iframe src="slope.html"></iframe>`); }
-    function openBartFullscreen(){ openOverlay(`<iframe src="bartblast.html"></iframe>`); }
-
-    async function openAdminPanel(){
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('username, level, xp, coins, muted, muted_until, mute_reason, is_admin')
-        .order('username', { ascending: true });
-
-      const listHtml = (profiles || []).map(p => {
-        const muted = p.muted || p.muted_until;
-        return `
-          <div class="admin-user">
-            <div class="admin-user-info">
-              <div class="admin-user-name">${p.username}${p.is_admin ? ' (admin)' : ''}</div>
-              <div class="admin-user-stats">Level: ${p.level || 1} | XP: ${p.xp || 0} | Coins: ${p.coins || 0} | Status: ${muted ? 'Muted' : 'Active'}</div>
-              <div class="admin-user-stats">Reason: ${p.mute_reason || 'None'}</div>
-            </div>
-            <div class="admin-user-actions">
-              ${muted
-                ? `<button class="admin-unmute-btn" data-action="unmute" data-user="${p.username}">Unmute</button>`
-                : `<button class="admin-mute-btn" data-action="mute" data-user="${p.username}">Mute</button>`
-              }
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      const o = openOverlay(`
-        <div class="admin-list">
-          <h3 style="margin-top:0">User Management</h3>
-          <div id="adminUserList">${listHtml || '<div>No users found.</div>'}</div>
-        </div>
-      `);
-
-      o.querySelectorAll('[data-action]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const targetUser = btn.dataset.user;
-          const action = btn.dataset.action;
-          const reason = action === 'mute' ? prompt('Mute reason?') || 'No reason specified' : null;
-
-          if (action === 'mute') {
-            await supabase.from('profiles').update({
-              muted: true,
-              muted_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-              mute_reason: reason
-            }).eq('username', targetUser);
-          } else {
-            await supabase.from('profiles').update({
-              muted: false,
-              muted_until: null,
-              mute_reason: null
-            }).eq('username', targetUser);
-          }
-
-          o.remove();
-          openAdminPanel();
-        });
-      });
+    async function buyGame(btnId, price, ownedKey) {
+      const p = await getProfile(username);
+      if (p.coins < price) return alert(`Need ${price} coins!`);
+      p.coins -= price;
+      p[ownedKey] = true;
+      await saveProfile(p);
+      alert('Purchased!');
+      loadGaming(++loadToken);
     }
 
-    function switchChannel(channel){
+    async function enterGamesChat() {
+      currentThreadId = 'games-chat';
+      setHeader('gaming', 'Game Chat');
+      $('messages').innerHTML = `<button class="back-btn" onclick="switchChannel('gaming')">← Back to Games</button>`;
+      await loadMessages('gaming', 'games-chat');
+    }
+
+    async function loadMessages(channel, threadId = null, token = ++loadToken) {
+      if (token !== loadToken || channel !== currentChannel || threadId !== currentThreadId) return;
+      
+      // ONLY back button in gaming chat thread - NO headers anywhere
+      const backButtonHtml = (channel === 'gaming' && threadId === 'games-chat') ? 
+        '<button class="back-btn" onclick="switchChannel(\'gaming\')">← Back to Games</button>' : '';
+      
+      $('messages').innerHTML = backButtonHtml;
+      
+      const query = supabase.from('messages').select('*').eq('channel', channel).order('created_at', { ascending: true }).limit(50);
+      if (threadId) query.eq('thread_id', threadId);
+      else query.is('thread_id', null);
+      
+      const { data: msgs } = await query;
+      
+      if (!msgs?.length) return addMessage('System', threadId === 'games-chat' ? 'Welcome to game chat!' : 'No messages yet.');
+      for (const m of msgs) await addMessage(m.username, m.text);
+    }
+
+    async function loadStats(token = ++loadToken) {
+      if (token !== loadToken || currentChannel !== 'stats') return;
+      const p = await getProfile(username);
+      $('messages').innerHTML = '';
+      await addMessage('System', `${p.username}<br><strong>Level:</strong> ${p.level}<br><strong>XP:</strong> ${p.xp}<br><strong>Coins:</strong> ${p.coins}`);
+    }
+
+    async function loadShop(token = ++loadToken) {
+      if (token !== loadToken || currentChannel !== 'shop') return;
+      $('messages').innerHTML = '<div class="message" style="text-align:center;color:#b9bbbe">🛒 Games in #gaming!</div>';
+    }
+
+    function openFrame(src) {
+      const overlay = document.createElement('div');
+      overlay.className = 'overlay';
+      overlay.innerHTML = `<div class="overlay-box"><button class="close-btn" onclick="this.parentElement.parentElement.remove()">×</button><iframe src="${src}"></iframe></div>`;
+      document.body.appendChild(overlay);
+    }
+
+    async function sendMessage() {
+      const text = $('messageInput').value.trim();
+      if (!text || ['stats','shop'].includes(currentChannel)) return;
+      
+      const p = await getProfile(username);
+      if (p.muted) return alert('You are muted!');
+      
+      const msg = {channel: currentChannel, username, text, created_at: new Date().toISOString(), thread_id: currentThreadId || null};
+      const { error } = await supabase.from('messages').insert(msg);
+      if (error) return alert('Send failed.');
+      
+      $('messageInput').value = '';
+      await addMessage(username, text);
+    }
+
+    async function switchChannel(channel) {
       currentChannel = channel;
-      renderChannelHeader(channel);
+      currentThreadId = null;
+      setHeader(channel);
       $('messages').innerHTML = '';
       const token = ++loadToken;
-      if(channel === 'stats') loadStats(token);
-      else if(channel === 'shop') loadShop(token);
-      else if(channel === 'adaminchat') loadMessages(channel, token);
-      else loadMessages(channel, token);
+      
+      if (channel === 'stats') await loadStats(token);
+      else if (channel === 'shop') await loadShop(token);
+      else if (channel === 'gaming') await loadGaming(token);
+      else await loadMessages(channel, null, token);
     }
 
-    $('sendBtn').addEventListener('click', sendMessage);
-    $('messageInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendMessage(); });
-    $('editProfileBtn').addEventListener('click', openProfileEditor);
-    $('adminPanelBtn').addEventListener('click', openAdminPanel);
-    document.querySelectorAll('.channel').forEach(el=>el.addEventListener('click', ()=>switchChannel(el.dataset.channel)));
+    $('sendBtn').onclick = sendMessage;
+    $('messageInput').onkeydown = e => e.key === 'Enter' && sendMessage();
+    document.querySelectorAll('.channel').forEach(el => el.onclick = () => switchChannel(el.dataset.channel));
 
-    renderChannelHeader('general');
-    await ensureProfile();
-    await refreshAdminButton();
-    await refreshAdminVisibility();
-    await loadMessages('general');
+    async function refreshAdmin() {
+      const p = await getProfile(username);
+      $('adminChatChannel').style.display = p.is_admin ? 'block' : 'none';
+      $('adminPanelBtn').style.display = p.is_admin ? 'block' : 'none';
+    }
+
+    await refreshAdmin();
+    switchChannel('general');
   </script>
 </body>
 </html>
