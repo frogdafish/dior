@@ -294,26 +294,26 @@
 
       const top = document.createElement('div');
       top.className = 'thread-topbar';
-      top.innerHTML = `<button id="gamesChatBtn" class="thread-create-btn"> Games Chat</button>`;
+      top.innerHTML = `<button id="gamesChatBtn" class="thread-create-btn">Games Chat</button>`;
       messagesEl.appendChild(top);
 
       const gamesGrid = document.createElement('div');
       gamesGrid.className = 'game-grid';
       gamesGrid.innerHTML = `
         <div class="game-card">
-          <h4> Snake Game</h4>
+          <h4>Snake Game</h4>
           <button class="shop-btn" id="playSnakeBtn">Play (Fullscreen)</button>
         </div>
         <div class="game-card">
-          <h4> Slope Game</h4>
+          <h4>Slope Game</h4>
           <button class="shop-btn" id="playSlopeBtn">Play (Fullscreen)</button>
         </div>
         <div class="game-card">
-          <h4> Bart Blast</h4>
+          <h4>Bart Blast</h4>
           <button class="shop-btn" id="playBartBtn">Play (Fullscreen)</button>
         </div>
         <div class="game-card">
-          <h4> Super Liquid Soccer</h4>
+          <h4>Super Liquid Soccer</h4>
           <button class="shop-btn" id="playSlsBtn">Play (Free)</button>
         </div>
       `;
@@ -380,7 +380,10 @@
 
       const top = document.createElement('div');
       top.className = 'thread-topbar';
-      top.innerHTML = `<button id="backToGamingBtn" class="thread-back-btn">← Back to Games</button>`;
+      top.innerHTML = `
+        <button id="backToGamingBtn" class="thread-back-btn">← Back to Games</button>
+        <button id="createGamingThreadBtn" class="thread-create-btn">Create Thread</button>
+      `;
       messagesEl.appendChild(top);
 
       const { data: threads } = await supabase
@@ -404,11 +407,12 @@
       if (!threads || !threads.length) {
         const empty = document.createElement('div');
         empty.className = 'message';
-        empty.textContent = 'No gaming threads yet. Click "Games Chat" in #gaming to create one!';
+        empty.textContent = 'No gaming threads yet. Click Create Thread to start one!';
         messagesEl.appendChild(empty);
       }
 
       $('backToGamingBtn').onclick = () => loadGaming();
+      $('createGamingThreadBtn').onclick = openCreateThreadModal;
       $('messageInput').placeholder = 'Discuss games in threads only';
     }
 
@@ -632,7 +636,7 @@
     async function loadShop(token = loadToken){
       const p = await loadProfile(username);
       if (token !== loadToken || currentChannel !== 'shop') return;
-      $('messages').innerHTML = '<div class="message"><div style="text-align:center;color:#b9bbbe"> Games are now in #gaming! Shop coming soon...</div></div>';
+      $('messages').innerHTML = '<div class="message"><div style="text-align:center;color:#b9bbbe">Games are now in #gaming! Shop coming soon...</div></div>';
     }
 
     function openOverlay(innerHTML){
@@ -704,7 +708,7 @@
         o.remove();
         if (currentChannel === 'suggestions') {
           await loadSuggestions();
-        } else {
+        } else if (currentChannel === 'gaming') {
           await loadGamingThreads();
         }
       };
