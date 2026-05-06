@@ -902,8 +902,9 @@ async function loadSuggestions(token = ++loadToken){
 
       o.querySelectorAll('[data-action="mute"]').forEach(btn => btn.onclick = async () => {
         const target = btn.dataset.user;
-        const reason = prompt('Mute reason?') || 'No reason specified';
         const p = await loadProfile(target);
+        if (p.muted) return alert('User is already muted. Use unmute first.');
+        const reason = prompt('Mute reason?') || 'No reason specified';
         p.muted = true;
         p.mute_reason = reason;
         p.muted_until = null;
@@ -914,6 +915,7 @@ async function loadSuggestions(token = ++loadToken){
       o.querySelectorAll('[data-action="unmute"]').forEach(btn => btn.onclick = async () => {
         const target = btn.dataset.user;
         const p = await loadProfile(target);
+        if (p.mute_reason === 'No name given, contact a dev via email or in school to be unmuted.') return alert('This user cannot be unmuted from the admin menu.');
         p.muted = false;
         p.muted_until = null;
         p.mute_reason = null;
